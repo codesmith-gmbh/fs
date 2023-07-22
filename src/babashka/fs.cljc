@@ -12,7 +12,8 @@
             FileVisitResult
             StandardCopyOption
             LinkOption Path
-            FileVisitor]
+            FileVisitor
+            ProviderMismatchException]
            [java.nio.file.attribute BasicFileAttributes FileAttribute FileTime PosixFilePermissions]
            [java.nio.charset Charset]
            [java.util.zip GZIPInputStream GZIPOutputStream ZipInputStream ZipOutputStream ZipEntry]
@@ -49,6 +50,19 @@
   (if (instance? Path path) (.toFile ^Path path)
       (io/file path)))
 
+(defn- resolve-path [^Path parent ^Path child]
+  "Resolves the child path against the parent path; component by component
+  in case of a ProviderMismatchException exception."
+  (try
+    (.resolve parent child)
+    (catch ProviderMismatchException _
+      (reduce (fn [^Path path ^Path component]
+                (if-let [file-name (.getFileName component)]
+                  (.resolve path (str file-name))
+                  path))
+              parent
+              (seq child)))))
+
 (defn- get-env [k]
   (System/getenv k))
 
@@ -58,7 +72,12 @@
   (^Path [f]
    (as-path f))
   (^Path [parent child]
-   (as-path (io/file (as-file parent) (as-file child))))
+   (let [child (as-path child)]
+     ;; we check for nil parent to reproduce the behaviour of `io/file` and,
+     ;; ultimately, of `(File. ^File parent ^String child)`.
+     (if (nil? parent)
+       child
+       (resolve-path (as-path parent) child))))
   (^Path [parent child & more]
    (reduce path (path parent child) more)))
 

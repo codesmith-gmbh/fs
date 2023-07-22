@@ -32,12 +32,16 @@
       (or (fvr-lookup x)
           (throw (Exception. "Expected: one of :continue, :skip-subtree, :skip-siblings, :terminate.")))))
 
+(def ^:private empty-string-array (into-array String []))
+
 (defn- as-path
   ^Path [path]
   (if (instance? Path path) path
       (if (instance? URI path)
         (java.nio.file.Paths/get ^URI path)
-        (.toPath (io/file path)))))
+        (if (instance? String path)
+          (java.nio.file.Paths/get ^String path empty-string-array)
+          (.toPath (io/file path))))))
 
 (defn- as-file
   "Coerces a path into a file if it isn't already one."
